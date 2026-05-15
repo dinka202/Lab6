@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Плагин анализа текстов</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <h1>Анализ текстов курсовых работ</h1>
+    <div class="upload-area" id="uploadArea">
+        <p>Перетащите сюда текстовый документ (.doc, .docx) или выберите файл в ручную</p>
+        <input type="file" id="fileInput" accept=".doc,.docx" hidden>
+        <button onclick="document.getElementById('fileInput').click()">
+            Выбрать файл
+        </button>
+    </div>
+    <div id="progress" style="display: none;">
+        <p>Загрузка: <span id="progressPercent">0%</span></p>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+    <div id="result" style="display: none;"></div>
+    <div class="actions">
+        <a href="list.html" class="btn">Список документов</a>
+    </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

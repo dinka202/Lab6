@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список документов</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <h1>Список загруженных документов</h1>
+    <div id="documentsList">
+        <p>Загрузка списка документов...</p>
+    </div>
+    <div class="actions">
+        <a href="index.html" class="btn">Загрузить новый документ</a>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('upload.php?action=list')
+            .then(response => response.json())
+            .then(data => {
+                const listContainer = document.getElementById('documentsList');
+
+                if (data.success && data.files.length > 0) {
+                    let html = '<ul class="documents-ul">';
+                    data.files.forEach(file => {
+                        html += `
+                                <li>
+                    <span>${file.name}</span>
+                    <div>
+                        <button onclick="checkDocument('${file.id}')">Проверить на уникальность</button>
+                        <a href="uploads/${file.name}" download class="download-btn">Скачать</a>
+                        <button onclick="deleteDocument('${file.id}')" class="delete-btn">Удалить</button>
+                    </div>
+                    </li>`;
+                    });
+                    html += '</ul>';
+                    listContainer.innerHTML = html;
+                } else {
+                    listContainer.innerHTML = '<p>Документы не найдены</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                document.getElementById('documentsList').innerHTML = '<p>Ошибка загрузки списка документов</p>';
+            });
+    });
+
+    function checkDocument(documentId) {
+        window.location.href = `check.php?id=${documentId}`;
+    }
+
+    function deleteDocument(documentId) {
+        if (confirm('Вы уверены, что хотите удалить этот документ?')) {
+            fetch('upload.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete&id=${documentId}`
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Документ удалён');
+                        location.reload();
+                    } else {
+                        alert('Ошибка при удалении документа');
+                    }
+                });
+        }
+    }
+</script>
+</body>
+</html>

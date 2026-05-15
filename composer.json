@@ -1,0 +1,6 @@
+{
+    "require": {
+        "paranoiq/php-zip": "^1.40",
+        "nelexa/zip": "*"
+    }
+}
