@@ -26,18 +26,26 @@ switch ($action) {
 }
 
 function handleUpload() {
-    if (empty($_FILES['file'])) {
-        echo json_encode(['success' => false, 'message' => 'Файл не выбран']);
+    if (empty($_FILES['file']) || empty($_POST['student_data'])) {
+        echo json_encode(['success' => false, 'message' => 'Не заполнены обязательные поля']);
         return;
     }
 
     $file = $_FILES['file'];
+    $studentData = json_decode($_POST['student_data'], true);
+
+    if (!isset($studentData['fio']) || !isset($studentData['course']) ||
+        !isset($studentData['faculty']) || !isset($studentData['direction']) ||
+        !isset($studentData['group'])) {
+        echo json_encode(['success' => false, 'message' => 'Не заполнены данные студента']);
+        return;
+    }
+
     $fileName = $file['name'];
     $fileTmp = $file['tmp_name'];
     $fileSize = $file['size'];
     $fileType = $file['type'];
 
-    // Проверка расширения
     $allowedExtensions = ['doc', 'docx'];
     $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
@@ -49,8 +57,13 @@ function handleUpload() {
         return;
     }
 
+    $studentDir = $GLOBALS['uploadDir'] . $studentData['fio'];
+    if (!is_dir($studentDir)) {
+        mkdir($studentDir, 0755, true);
+    }
+
     $uniqueName = uniqid() . '_' . $fileName;
-    $filePath = $GLOBALS['uploadDir'] . $uniqueName;
+    $filePath = $studentDir . '/' . $uniqueName;
 
     if (move_uploaded_file($fileTmp, $filePath)) {
         $textContent = extractTextFromDocx($filePath);
@@ -64,23 +77,78 @@ function handleUpload() {
             'original_name' => $uniqueName,
             'size' => $fileSize,
             'uploaded_at' => date('Y-m-d H:i:s'),
-            'text_file' => $textFilePath
+            'text_file' => $textFilePath,
+            'student' => $studentData
         ];
 
         $metadataFile = $GLOBALS['dataDir'] . $metadata['id'] . '.json';
         file_put_contents($metadataFile, json_encode($metadata));
 
-        echo json_encode([
-            'success' => true,
-            'message' => 'Файл успешно загружен',
-            'document' => $metadata
-        ]);
+        $studentInfoFile = $studentDir . '/info.txt';
+        $studentInfo = "ФИО: " . $studentData['fio'] . PHP_EOL;
+        $studentInfo .= "Курс: " . $studentData['course'] . PHP_EOL;
+        $studentInfo .= "Факультет: " . $studentData['faculty'] . PHP_EOL;
+        $studentInfo .= "Направление подготовки: " . $studentData['direction'] . PHP_EOL;
+        $studentInfo .= "Группа: " . $studentData['group'] . PHP_EOL;
+
+        $similarityResults = checkSimilarity($textContent, $GLOBALS['dataDir']);
+        $studentInfo .= "\nРезультаты проверки на уникальность:\n";
+        foreach ($similarityResults as $result) {
+            $studentInfo .= "- Документ: {$result['name']} - Сходство: {$result['similarity']}%\n";
+        }
+
+        if (file_put_contents($studentInfoFile, $studentInfo)) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Файл успешно загружен',
+                'document' => $metadata
+            ]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Ошибка при сохранении информации о студенте'
+            ]);
+        }
     } else {
         echo json_encode([
             'success' => false,
             'message' => 'Ошибка при загрузке файла'
         ]);
     }
+}
+
+function checkSimilarity($text, $dataDir) {
+    $results = [];
+    $jsonFiles = glob($dataDir . '*.json');
+
+    foreach ($jsonFiles as $jsonFile) {
+        $metadata = json_decode(file_get_contents($jsonFile), true);
+        $textFile = $metadata['text_file'];
+
+        if (file_exists($textFile)) {
+            $existingText = file_get_contents($textFile);
+            $similarity = calculateSimilarity($text, $existingText);
+
+            $results[] = [
+                'name' => $metadata['name'],
+                'similarity' => round($similarity * 100, 2)
+            ];
+        }
+    }
+
+    return $results;
+}
+
+function calculateSimilarity($text1, $text2) {
+    $words1 = array_unique(preg_split('/\s+/', strtolower($text1)));
+    $words2 = array_unique(preg_split('/\s+/', strtolower($text2)));
+
+    $intersection = array_intersect($words1, $words2);
+    $union = array_unique(array_merge($words1, $words2));
+
+    if (count($union) === 0) return 0;
+
+    return count($intersection) / count($union);
 }
 
 function extractTextFromDocx($filePath) {
@@ -156,7 +224,6 @@ function deleteFile() {
 
     $metadata = json_decode(file_get_contents($metadataFile), true);
 
-    // Удаление файлов
     if (file_exists($uploadDir . $metadata['original_name'])) {
         unlink($uploadDir . $metadata['original_name']);
     }
